@@ -2,7 +2,9 @@
 to-do:
 - checkbox for each tasks that is stored in local storage
 - maybe update api completed status
-- css class that changes appearance based on completion
+Add a completed checkbox for each task
+- Add a parameter to addTask to indicated whether completed
+- Add a CSS class for completed that dims the element/applies a strikethrough
 */
 
 //defines html elements
@@ -21,8 +23,7 @@ loadTasks();
 
 taskButton.addEventListener("click", updateUserTask);
 
-
-function addTask(name){
+function addTask(name, checked=false){
     let newTask = document.createElement("li");
 
     //updates array
@@ -30,12 +31,19 @@ function addTask(name){
     let uuid = crypto.randomUUID();
     tasks.push({
         id: uuid,
-        name
+        name,
+        checked
     });
     
     //updates html
-    newTask.textContent = name + " ";
+    let taskSpan = document.createElement("span");
+    newTask.appendChild(taskSpan)
+    taskSpan.textContent = name + " ";
+
     newTask.append(...createButtons(newTask, uuid));
+
+    newTask.querySelector("input[type=checkbox]").checked = checked;
+
     taskList.appendChild(newTask);
 }
 
@@ -53,11 +61,12 @@ async function updateUserTask(){
             })
         });
     } else if (taskButton.innerHTML === "Save Task"){
-        editingTask.textContent = taskInput.value + " ";
+        editingTask.firstElementChild.textContent = taskInput.value + " ";
+        //editingTask.querySelector("span").textContent
+        // <li><input/> <span/> <button/></li> 
         //checks task array for a task object with an id that matches the task we're
         //currently editing and sets the name of it to the task input value
         tasks.find(a => a.id === editingTaskId).name = taskInput.value;
-        editingTask.append(...createButtons(editingTask, editingTaskId));
         taskButton.innerHTML = "Add Task";
     }
     taskInput.value = "";
@@ -74,6 +83,13 @@ function createButtons(newTask, id){
         taskInput.value = tasks.find(a => a.id === editingTaskId).name;
     });
     editButton.textContent = "Edit";
+
+    let checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.addEventListener("change", () => {
+        tasks.find(a => a.id === id).checked = checkbox.checked;
+        saveTasks();
+    })
 
     let deleteButton = document.createElement("button");
     deleteButton.addEventListener("click", () => {
@@ -94,7 +110,7 @@ function createButtons(newTask, id){
     });
     deleteButton.textContent = "Delete";
 
-    return [editButton, deleteButton];
+    return [editButton, deleteButton, checkbox];
 }
 
 function saveTasks(){
@@ -107,7 +123,7 @@ function loadTasks(){
     let newTasks = JSON.parse(currentTasks);
     if (newTasks != null){
         for (let task of newTasks){
-            addTask(task.name);
+            addTask(task.name, task.checked);
         }
     }
 }
@@ -122,7 +138,7 @@ downloadButton.addEventListener("click", async () => {
     });
     let responseJson = await response.json();
     for (let task of responseJson.todos){
-        addTask(task.todo);
+        addTask(task.todo, task.completed);
     }
 });
 

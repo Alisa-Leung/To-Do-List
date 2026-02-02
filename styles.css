@@ -1,0 +1,5 @@
+li:has(input[type=checkbox]:checked) {
+    text-decoration: line-through;
+    color: gray;
+}
+
