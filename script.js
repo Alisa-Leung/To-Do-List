@@ -1,20 +1,16 @@
 /*
 to-do:
-- find the total number of completed tasks
+- update date span when task is updated
+  * find the date span:
+      .children
+      .querySelector(:nth-child)
+      add a custom class (.classList) to the dateSpan and use with querySelector
 
-sorry i like completely avoided this
-i did try out sort, but it wasnt working out how i wanted it to :(
-- reduce
-- findLastIndex
-- sort  (with a custom function)
-*/
+- look at docs for toLocaleString
+  second parameter: "shorten" the string (leave out seconds)
+  "lengthen" the string (spelling out the month, day of week)
 
-//ok the game plan for how were gonna sort this out"
-/*
-prepend to the beginning of the html document when created
-append to the end of the html document when checked off
-what if i just like...dont sort localstorage. eheheh
-when an element no longer exists, don't allow for editing (clear editing)
+
 */
 
 //defines html elements
@@ -36,7 +32,7 @@ loadTasks();
 
 taskButton.addEventListener("click", updateUserTask);
 
-function addTask(name, completed=false){
+function addTask(name, date, completed=false){
     let newTask = document.createElement("li");
 
     //updates array
@@ -45,13 +41,18 @@ function addTask(name, completed=false){
     tasks.push({
         id: uuid,
         name,
-        completed
+        completed,
+        date
     });
     
     //updates html
     let taskSpan = document.createElement("span");
     newTask.appendChild(taskSpan)
     taskSpan.textContent = name + " ";
+
+    let dateSpan = document.createElement("span");
+    dateSpan.textContent = numToDate(date);
+    newTask.appendChild(dateSpan);
 
     newTask.append(...createButtons(newTask, uuid));
 
@@ -65,27 +66,33 @@ function addTask(name, completed=false){
 
 //any changes to tasks
 async function updateUserTask(){
-    if (taskButton.innerHTML === "Add Task"){ 
-        addTask(taskInput.value);
-        await fetch("https://dummyjson.com/todos/add", {
-            method: "POST",
-            body: JSON.stringify({
-                todo: taskInput.value,
-                headers: { 'Content-Type': 'application/json' },
-                completed: false,
-                userId: 1
-            })
-        });
-    } else if (taskButton.innerHTML === "Save Task" && tasks.find(a => a.id === editingTaskId)){
-        editingTask.firstElementChild.textContent = taskInput.value + " ";
-        //editingTask.querySelector("span").textContent
-        // <li><input/> <span/> <button/></li> 
-        //checks task array for a task object with an id that matches the task we're
-        //currently editing and sets the name of it to the task input value
-        tasks.find(a => a.id === editingTaskId).name = taskInput.value;
-        taskButton.innerHTML = "Add Task";
-    } else {
-        alert("Please save your item to a valid task!")
+    if (taskInput.value.trim() !== ""){
+        if (taskButton.innerHTML === "Add Task"){ 
+            addTask(taskInput.value, Date.now());
+            await fetch("https://dummyjson.com/todos/add", {
+                method: "POST",
+                body: JSON.stringify({
+                    todo: taskInput.value,
+                    headers: { 'Content-Type': 'application/json' },
+                    completed: false,
+                    userId: 1
+                })
+            });
+        } else if (taskButton.innerHTML === "Save Task" && tasks.find(a => a.id === editingTaskId)){
+            let editingTaskObj = tasks.find(a => a.id === editingTaskId);
+            editingTask.firstElementChild.textContent = taskInput.value + " ";
+            //editingTask.querySelector("span").textContent
+            // <li><input/> <span/> <button/></li> 
+            //checks task array for a task object with an id that matches the task we're
+            //currently editing and sets the name of it to the task input value
+            editingTaskObj.name = taskInput.value;
+            editingTaskObj.date = Date.now();
+            taskButton.innerHTML = "Add Task"; 
+        } else {
+            alert("Please save your item to a valid task!")
+        }
+    } else{
+        alert("Please enter a valid task!")
     }
     taskInput.value = "";
     saveTasks();
@@ -105,7 +112,9 @@ function createButtons(newTask, id){
     let checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.addEventListener("change", () => {
-        tasks.find(a => a.id === id).completed = checkbox.checked;
+        let completedTaskObj = tasks.find(a => a.id === id);
+        completedTaskObj.completed = checkbox.checked;
+        completedTaskObj.date = Date.now();
         if (tasks.find(a => a.id === id).completed) {
             recentCompletedTaskIndex = tasks.findIndex(a => a.id === id);
             console.log(recentCompletedTaskIndex);
@@ -149,7 +158,9 @@ function loadTasks(){
     let newTasks = JSON.parse(currentTasks);
     if (newTasks != null){
         for (let task of newTasks){
-            addTask(task.name, task.completed);
+            // let task = { name: "do chores", completed: false }
+            // task.date
+            addTask(task.name, task.date ?? Date.now(), task.completed);
         }
     }
     updateCompletedTasks()
@@ -165,11 +176,73 @@ downloadButton.addEventListener("click", async () => {
     });
     let responseJson = await response.json();
     for (let task of responseJson.todos){
-        addTask(task.todo, task.completed);
+        addTask(task.todo, 0, task.completed);
     }
 });
 
 function updateCompletedTasks() {
+    tasks.reduce((accumulator, task) => {
+        if (task.completed){
+            accumulator++;
+        }
+        return accumulator;
+    }, 0);
     let totalCompletedTasks = tasks.filter(task => task.completed).length;
     completedTaskElement.innerHTML = "Total Completed Tasks: " + totalCompletedTasks;
+}
+
+function sortTasks() {
+    let ex = [1, 4, 2, 5, 6];
+    ex.sort((a, b) => {
+        // a = 1
+        // b = 6
+        // return 1 - 6 = return -5
+        // < 0 == a before b
+        // > 0 == b before a
+        return a - b;
+    });
+
+    tasks.sort((a, b) => {
+        if (a.completed && !b.completed){
+            return 1;
+        } else if (!a.completed && b.completed){
+            return -1;
+        } else{
+            // a = "abc"
+            // b = "bcd"
+            // a.compareTo(b)   
+            // < 0 if a before b
+            // b.compareTo(a)
+            // > 0 b after a
+            
+            return a.name.localeCompare(b.name);
+            // "abc".localeCompare("bcd")
+        }
+    });
+
+    tasks.sort((a, b) => {
+        //sort by name, but use completed as a tie-breaker
+        if (a.name === b.name){
+            // true ~ 1
+            // false ~ 0
+            // true - true === 0
+            // true - false === 1
+            if (a.completed && !b.completed){
+                return 1;
+            } else if (!a.completed && b.completed){
+                return -1;
+            } else {
+                return 0;
+            }
+        } else{
+            return a.name.localeCompare(b.name);
+        }
+    });
+}
+
+function numToDate(num){
+    let dateObj = new Date(num);
+    // new Date(Date.now());
+    // new Date().toLocaleString()
+    return dateObj.toLocaleString();
 }
