@@ -17,6 +17,7 @@ to-do:
 let taskButton = document.getElementById("taskButton");
 let taskList = document.getElementById("taskList");
 let taskInput = document.getElementById("taskInput");
+let dueDateInput = document.getElementById("dueDateInput");
 
 //variables for editing tasks
 let editingTask;
@@ -32,7 +33,7 @@ loadTasks();
 
 taskButton.addEventListener("click", updateUserTask);
 
-function addTask(name, date, completed=false){
+function addTask(name, date, dueDate, completed=false){
     let newTask = document.createElement("li");
 
     //updates array
@@ -42,7 +43,8 @@ function addTask(name, date, completed=false){
         id: uuid,
         name,
         completed,
-        date
+        date,
+        dueDate
     });
     
     //updates html
@@ -51,8 +53,14 @@ function addTask(name, date, completed=false){
     taskSpan.textContent = name + " ";
 
     let dateSpan = document.createElement("span");
+    dateSpan.classList.add("date");
     dateSpan.textContent = numToDate(date);
     newTask.appendChild(dateSpan);
+
+    let dueDateSpan = document.createElement("span");
+    dueDateSpan.classList.add("dueDate");
+    dueDateSpan.textContent = numToDate(dueDate);
+    newTask.appendChild(dueDateSpan);
 
     newTask.append(...createButtons(newTask, uuid));
 
@@ -67,8 +75,10 @@ function addTask(name, date, completed=false){
 //any changes to tasks
 async function updateUserTask(){
     if (taskInput.value.trim() !== ""){
+        // Parse date
+        let parsedDueDate = Date.parse(dueDateInput.value);
         if (taskButton.innerHTML === "Add Task"){ 
-            addTask(taskInput.value, Date.now());
+            addTask(taskInput.value, Date.now(), parsedDueDate);
             await fetch("https://dummyjson.com/todos/add", {
                 method: "POST",
                 body: JSON.stringify({
@@ -87,7 +97,12 @@ async function updateUserTask(){
             //currently editing and sets the name of it to the task input value
             editingTaskObj.name = taskInput.value;
             editingTaskObj.date = Date.now();
-            taskButton.innerHTML = "Add Task"; 
+            editingTaskObj.dueDate = parsedDueDate;
+            editingTask.querySelector(".date").innerText = numToDate(editingTaskObj.date);
+            editingTask.querySelector(".dueDate").innerText = numToDate(parsedDueDate);
+            taskButton.innerText = "Add Task"; 
+            // XSS attack
+            //taskButton.innerHTML = "<script></script>"
         } else {
             alert("Please save your item to a valid task!")
         }
@@ -106,6 +121,16 @@ function createButtons(newTask, id){
         editingTask = newTask;
         editingTaskId = id;
         taskInput.value = tasks.find(a => a.id === editingTaskId).name;
+        // YYYY-MM-DDTHH:MM:SS -  ISO 8601
+        // 2026-03-08T17:00:00Z-07:00
+        // 2026-03-08:........Z
+        let dueDate = new Date(tasks.find(a => a.id === editingTaskId).dueDate);
+        dueDate.setMinutes(dueDate.getMinutes() - dueDate.getTimezoneOffset());
+        let isoString = dueDate.toISOString();
+        // 2026-03-08T00:00:00Z
+        // 2026-03-08T00:00:00
+        dueDateInput.value = isoString.slice(0, isoString.length - 1);
+        // Temporal
     });
     editButton.textContent = "Edit";
 
@@ -160,7 +185,7 @@ function loadTasks(){
         for (let task of newTasks){
             // let task = { name: "do chores", completed: false }
             // task.date
-            addTask(task.name, task.date ?? Date.now(), task.completed);
+            addTask(task.name, task.date ?? Date.now(), task.dueDate ?? Date.now(), task.completed);
         }
     }
     updateCompletedTasks()
@@ -244,5 +269,8 @@ function numToDate(num){
     let dateObj = new Date(num);
     // new Date(Date.now());
     // new Date().toLocaleString()
-    return dateObj.toLocaleString();
+    return dateObj.toLocaleString("en-US", {
+        dateStyle: "long",
+        timeStyle: "short"
+    });
 }
